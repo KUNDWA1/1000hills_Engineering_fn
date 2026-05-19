@@ -4,6 +4,7 @@ import { constructionToolsProducts } from '../../data/ConstructionTools_products
 import { generatorsProducts } from '../../data/Generators & Power_products';
 import { securityProducts } from '../../data/Security & IT_products';
 import { solarProducts } from '../../data/Solar & Energy_products';
+import AuthModal from '../Auth/AuthModal';
 
 const categories = [
   { key: 'construction-tools', label: 'Construction Tools', products: constructionToolsProducts },
@@ -14,6 +15,7 @@ const categories = [
 
 export default function Navbar({ activePage, activeCategory, onCategoryChange, onGoHome, cartCount, onCartOpen, onSearch }) {
   const [inputVal, setInputVal] = useState('');
+  const [authOpen, setAuthOpen] = useState(false);   // ← NEW
 
   function handleSearch() {
     if (inputVal.trim()) onSearch(inputVal.trim());
@@ -52,8 +54,22 @@ export default function Navbar({ activePage, activeCategory, onCategoryChange, o
             <button className={styles.searchBtn} onClick={handleSearch}>SEARCH</button>
           </div>
 
-          {/* Icons: cart + account */}
+          {/* Icons: account + cart */}
           <div className={styles.topRight}>
+
+            {/* Account button → opens AuthModal */}
+            <button
+              className={styles.iconBtn}
+              title="Account"
+              onClick={() => setAuthOpen(true)}   // ← NEW
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            </button>
+
+            {/* Cart button */}
             <button className={styles.iconBtn} onClick={onCartOpen} title="Cart">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
@@ -62,12 +78,7 @@ export default function Navbar({ activePage, activeCategory, onCategoryChange, o
               </svg>
               {cartCount > 0 && <span className={styles.cartBadge}>{cartCount}</span>}
             </button>
-            <button className={styles.iconBtn} title="Account">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
-                <circle cx="12" cy="7" r="4"/>
-              </svg>
-            </button>
+
           </div>
         </div>
       </div>
@@ -92,6 +103,9 @@ export default function Navbar({ activePage, activeCategory, onCategoryChange, o
           </a>
         </div>
       </div>
+
+      {/* ── AUTH MODAL ── */}
+      <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} />   {/* ← NEW */}
 
     </header>
   );

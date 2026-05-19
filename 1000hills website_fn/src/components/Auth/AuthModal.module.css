@@ -1,0 +1,204 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@300;400;500&display=swap');
+
+/* ── OVERLAY ── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.60);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── MODAL BOX ── */
+.modal {
+  background: #f5f2ed;
+  border-radius: 20px;
+  padding: 36px 32px 28px;
+  width: 420px;
+  max-width: 92vw;
+  position: relative;
+  animation: slideUp 0.25s ease;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(22px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* ── CLOSE BUTTON ── */
+.closeBtn {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #aaa;
+  cursor: pointer;
+  line-height: 1;
+  transition: color 0.2s;
+  font-family: 'Barlow', sans-serif;
+}
+.closeBtn:hover { color: #333; }
+
+/* ── BRAND BADGE ── */
+.badge {
+  width: 52px;
+  height: 52px;
+  background: #111;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 18px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 20px;
+  color: #fff;
+  letter-spacing: 1px;
+}
+
+/* ── HEADINGS ── */
+.title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 30px;
+  letter-spacing: 4px;
+  text-align: center;
+  color: #111;
+  margin-bottom: 4px;
+}
+
+.subtitle {
+  font-family: 'Barlow', sans-serif;
+  font-size: 11px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  text-align: center;
+  color: #999;
+  margin-bottom: 28px;
+}
+
+/* ── FORM FIELDS ── */
+.fieldGroup {
+  margin-bottom: 18px;
+}
+
+.labelRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.label {
+  display: block;
+  font-family: 'Barlow', sans-serif;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #555;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+/* when label is inside labelRow, remove its bottom margin */
+.labelRow .label {
+  margin-bottom: 0;
+}
+
+.forgotLink {
+  font-family: 'Barlow', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: #c9a84c;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: opacity 0.2s;
+}
+.forgotLink:hover { opacity: 0.75; text-decoration: underline; }
+
+.input {
+  width: 100%;
+  background: #e8e4dc;
+  border: 1.5px solid transparent;
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 15px;
+  color: #222;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s;
+}
+.input::placeholder {
+  color: #aaa;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+.input:focus {
+  border-color: #c9a84c;
+  background: #edeae2;
+}
+
+/* ── BUTTONS ── */
+.primaryBtn {
+  width: 100%;
+  background: #111;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 16px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 17px;
+  letter-spacing: 4px;
+  cursor: pointer;
+  margin-top: 6px;
+  transition: background 0.2s;
+}
+.primaryBtn:hover { background: #333; }
+
+.secondaryBtn {
+  width: 100%;
+  background: transparent;
+  color: #333;
+  border: 1.5px solid #ccc;
+  border-radius: 10px;
+  padding: 15px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 17px;
+  letter-spacing: 4px;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.secondaryBtn:hover { border-color: #888; color: #111; }
+
+/* ── DIVIDER ── */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 22px 0 16px;
+  color: #bbb;
+  font-family: 'Barlow', sans-serif;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #ddd;
+}
