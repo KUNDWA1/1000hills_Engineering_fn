@@ -1,0 +1,148 @@
+.footer {
+  background: rgba(234, 234, 229, 0.95);
+  color: rgba(255,255,255,0.6);
+  margin-top: 60px;
+  border-top: 2px solid var(--accent);
+}
+
+.inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 48px 24px 36px;
+  display: flex;
+  gap: 60px;
+  align-items: flex-start;
+}
+
+.brand {
+  flex: 1.2;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.logoMark {
+  color: var(--accent-light);
+  font-size: 22px;
+}
+
+.logoName {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.15em;
+  color: #100e0e;
+}
+
+.tagline {
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(22, 22, 22, 0.45);
+  max-width: 280px;
+}
+
+.links {
+  display: flex;
+  gap: 60px;
+}
+
+.linkGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.linkGroup ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.groupTitle {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.linkBtn {
+  background: none;
+  border: none;
+  color: rgba(14, 13, 13, 0.45);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+  text-decoration: none;
+  display: block;
+  transition: color 0.15s;
+}
+
+.linkBtn:hover {
+  color: rgba(205, 102, 102, 0.9);
+}
+
+/* BOTTOM BAR */
+.bottom {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 16px 24px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.bottomNav {
+  display: flex;
+  gap: 20px;
+}
+
+.bottomLink {
+  background: none;
+  border: none;
+  color: rgba(14, 11, 11, 0.35);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: color 0.15s;
+}
+
+.bottomLink:hover {
+  color: rgba(201, 84, 84, 0.7);
+}
+
+.copy {
+  font-size: 11px;
+  color: rgba(255,255,255,0.25);
+  letter-spacing: 0.03em;
+}
+
+@media (max-width: 768px) {
+  .inner {
+    flex-direction: column;
+    gap: 32px;
+  }
+  .links {
+    gap: 32px;
+  }
+  .bottom {
+    flex-direction: column;
+    gap: 10px;
+    text-align: center;
+  }
+}
