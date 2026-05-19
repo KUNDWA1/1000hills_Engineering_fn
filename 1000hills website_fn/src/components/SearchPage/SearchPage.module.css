@@ -1,0 +1,103 @@
+.page {
+  min-height: 60vh;
+  padding: 48px 24px 80px;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #888;
+  text-transform: uppercase;
+  margin: 0 0 8px;
+}
+
+.title {
+  font-size: 32px;
+  font-weight: 800;
+  color: #111;
+  margin: 0 0 8px;
+  letter-spacing: -0.02em;
+}
+
+.sub {
+  font-size: 14px;
+  color: #666;
+  margin: 0 0 40px;
+}
+
+.resultsHeader {
+  border-top: 2px solid #111;
+  padding-top: 16px;
+  margin-bottom: 28px;
+}
+
+.resultsLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #888;
+  text-transform: uppercase;
+  margin: 0 0 6px;
+}
+
+.resultsCount {
+  font-size: 14px;
+  color: #444;
+  margin: 0 0 4px;
+}
+
+.itemCount {
+  font-size: 12px;
+  color: #888;
+  margin: 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 1024px) {
+  .grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 480px) {
+  .grid { grid-template-columns: 1fr; }
+}
+
+.cardWrap {
+  animation: fadeUp 0.3s ease both;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 80px 24px;
+  text-align: center;
+  color: #444;
+}
+
+.emptySub {
+  font-size: 13px;
+  color: #999;
+  margin: 0;
+}

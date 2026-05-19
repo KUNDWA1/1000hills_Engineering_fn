@@ -1,0 +1,233 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+
+/* ── ROW 1: BLACK ── */
+.topBar {
+  background: #111110;
+  border-bottom: 1px solid #2a2a28;
+}
+
+.topInner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 20px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* LOGO */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.logoBox {
+  background: var(--accent);
+  color: #fff;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  padding: 3px 6px;
+  border-radius: 2px;
+  line-height: 1;
+}
+
+.logoName {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #fff;
+  white-space: nowrap;
+}
+
+/* SEARCH */
+.searchWrap {
+  flex: 1;
+  max-width: 480px;
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 11px;
+  color: #999;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.searchInput {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: 'Barlow', sans-serif;
+  font-size: 12.5px;
+  color: #222;
+  padding: 9px 10px 9px 32px;
+}
+
+.searchInput::placeholder {
+  color: #aaa;
+}
+
+.searchBtn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 0 16px;
+  height: 36px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.searchBtn:hover {
+  background: var(--accent-hover);
+}
+
+/* RIGHT ICONS */
+.topRight {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.iconBtn {
+  position: relative;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.65);
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.iconBtn:hover {
+  color: #fff;
+  background: rgba(255,255,255,0.08);
+}
+
+.cartBadge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+  font-size: 9px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Barlow Condensed', sans-serif;
+}
+
+/* ── ROW 2: WHITE ── */
+.bottomBar {
+  background: #ffffff;
+  border-bottom: 1px solid #e5e2dc;
+}
+
+.bottomInner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 20px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.catNav {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: 100%;
+}
+
+.catBtn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #555;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 0 16px;
+  height: 44px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.catBtn:hover {
+  color: #111;
+}
+
+.catActive {
+  color: #111;
+  border-bottom-color: var(--accent);
+}
+
+/* Support */
+.supportLink {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.supportLabel {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  color: var(--accent);
+}
+
+.supportNum {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+}
+
+@media (max-width: 768px) {
+  .logoName { display: none; }
+  .searchWrap { max-width: none; }
+  .catBtn { padding: 0 10px; font-size: 11px; }
+  .supportLink { display: none; }
+}

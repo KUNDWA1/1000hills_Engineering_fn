@@ -1,122 +1,210 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState, useCallback } from 'react';
+import Navbar from './components/Navbar/Navbar';
+import HomePage from './components/HomePage/HomePage';
+import ProductCard from './components/ProductCard/ProductCard';
+import ProductDetail from './components/ProductDetail/ProductDetail';
+import SearchPage from './components/SearchPage/SearchPage';
+import Cart from './components/Cart/Cart';
+import Footer from './components/Footer/Footer';
 
-function App() {
-  const [count, setCount] = useState(0)
+import { constructionToolsProducts } from './data/ConstructionTools_products';
+import { generatorsProducts } from './data/Generators & Power_products';
+import { securityProducts } from './data/Security & IT_products';
+import { solarProducts } from './data/Solar & Energy_products';
+
+import styles from './App.module.css';
+
+const products = {
+  'construction-tools': constructionToolsProducts,
+  'generators-power': generatorsProducts,
+  'security-it': securityProducts,
+  'solar-energy': solarProducts,
+};
+
+const allProducts = Object.values(products).flat();
+
+const categoryMeta = {
+  'construction-tools': { title: 'Construction Tools', sub: 'Professional construction equipment' },
+  'generators-power':   { title: 'Generators & Power', sub: 'Reliable power solutions' },
+  'security-it':        { title: 'Security & IT',      sub: 'Security and technology products' },
+  'solar-energy':       { title: 'Solar & Energy',     sub: 'Clean energy solutions' },
+};
+
+export default function App() {
+  // 'home' | 'category' | 'detail' | 'search'
+  const [activePage, setActivePage]       = useState('home');
+  const [activeCategory, setActiveCategory] = useState('construction-tools');
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [searchQuery, setSearchQuery]     = useState('');
+  const [categorySearch, setCategorySearch] = useState('');
+  const [cart, setCart]                   = useState([]);
+  const [cartOpen, setCartOpen]           = useState(false);
+
+  // ── Cart helpers ──
+  const addToCart = useCallback((product) => {
+    setCart((prev) => {
+      const existing = prev.find((i) => i.id === product.id);
+      if (existing) return prev.map((i) => i.id === product.id ? { ...i, qty: i.qty + 1 } : i);
+      return [...prev, { ...product, qty: 1 }];
+    });
+  }, []);
+
+  const removeFromCart = useCallback((id) => {
+    setCart((prev) => prev.filter((i) => i.id !== id));
+  }, []);
+
+  const updateQty = useCallback((id, qty) => {
+    if (qty <= 0) setCart((prev) => prev.filter((i) => i.id !== id));
+    else setCart((prev) => prev.map((i) => i.id === id ? { ...i, qty } : i));
+  }, []);
+
+  const cartCount = cart.reduce((s, i) => s + i.qty, 0);
+
+  // ── Navigation ──
+  function goHome() {
+    setActivePage('home');
+    setSelectedProduct(null);
+    setCategorySearch('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function goCategory(key) {
+    setActiveCategory(key);
+    setActivePage('category');
+    setSelectedProduct(null);
+    setCategorySearch('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function goDetail(product) {
+    setSelectedProduct(product);
+    setActivePage('detail');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function goBackFromDetail() {
+    setActivePage('category');
+    setSelectedProduct(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function goSearch(query) {
+    setSearchQuery(query);
+    setActivePage('search');
+    setSelectedProduct(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // ── Category page filtered products ──
+  const allItems = products[activeCategory] || [];
+  const filtered = categorySearch.trim()
+    ? allItems.filter((p) =>
+        p.name.toLowerCase().includes(categorySearch.toLowerCase()) ||
+        p.brand.toLowerCase().includes(categorySearch.toLowerCase())
+      )
+    : allItems;
+
+  const meta = categoryMeta[activeCategory];
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div className={styles.app}>
+      <Navbar
+        activePage={activePage}
+        activeCategory={activeCategory}
+        onCategoryChange={goCategory}
+        onGoHome={goHome}
+        cartCount={cartCount}
+        onCartOpen={() => setCartOpen(true)}
+        onSearch={goSearch}
+      />
 
-      <div className="ticks"></div>
+      {/* ── HOME PAGE ── */}
+      {activePage === 'home' && (
+        <HomePage
+          onCategoryChange={goCategory}
+          onAddToCart={addToCart}
+          onProductClick={goDetail}
+        />
+      )}
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      {/* ── SEARCH PAGE ── */}
+      {activePage === 'search' && (
+        <SearchPage
+          query={searchQuery}
+          allProducts={allProducts}
+          onAddToCart={addToCart}
+          onProductClick={goDetail}
+        />
+      )}
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      {/* ── CATEGORY PAGE ── */}
+      {activePage === 'category' && (
+        <main className={styles.main}>
+          <div className={styles.sectionHeader}>
+            <div className={styles.sectionLeft}>
+              <h2 className={styles.sectionTitle}>{meta.title.toUpperCase()}</h2>
+              <p className={styles.sectionSub}>{meta.sub.toUpperCase()}</p>
+            </div>
+
+            <div className={styles.searchWrap}>
+              <svg className={styles.searchIcon} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input
+                type="text"
+                className={styles.searchInput}
+                placeholder="Search products..."
+                value={categorySearch}
+                onChange={(e) => setCategorySearch(e.target.value)}
+              />
+              {categorySearch && (
+                <button className={styles.clearSearch} onClick={() => setCategorySearch('')}>×</button>
+              )}
+            </div>
+          </div>
+
+          {filtered.length > 0 ? (
+            <div className={styles.grid} key={activeCategory}>
+              {filtered.map((product, index) => (
+                <div key={product.id} style={{ animationDelay: `${index * 55}ms` }} className={styles.cardWrapper}>
+                  <ProductCard product={product} onAddToCart={addToCart} onProductClick={goDetail} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className={styles.noResults}>
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" opacity="0.3">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <p>No products found for "<strong>{categorySearch}</strong>"</p>
+              <button className={styles.clearSearchBtn} onClick={() => setCategorySearch('')}>Clear search</button>
+            </div>
+          )}
+        </main>
+      )}
+
+      {/* ── DETAIL PAGE ── */}
+      {activePage === 'detail' && selectedProduct && (
+        <ProductDetail
+          product={selectedProduct}
+          allProducts={allProducts}
+          onBack={goBackFromDetail}
+          onAddToCart={addToCart}
+          onProductClick={goDetail}
+        />
+      )}
+
+      <Footer onCategoryChange={goCategory} onGoHome={goHome} />
+
+      <Cart
+        isOpen={cartOpen}
+        onClose={() => setCartOpen(false)}
+        items={cart}
+        onRemove={removeFromCart}
+        onUpdateQty={updateQty}
+      />
+    </div>
+  );
 }
-
-export default App
