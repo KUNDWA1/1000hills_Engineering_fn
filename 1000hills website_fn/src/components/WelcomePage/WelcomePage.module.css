@@ -1,0 +1,123 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@300;400;500&display=swap');
+
+.wrapper {
+  min-height: 70vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  background: #f5f2ed;
+}
+
+.card {
+  background: #fff;
+  border-radius: 24px;
+  padding: 52px 44px;
+  max-width: 540px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.10);
+  animation: popIn 0.4s ease;
+}
+
+@keyframes popIn {
+  from { transform: scale(0.92); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+
+.badge {
+  width: 56px;
+  height: 56px;
+  background: #111;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  color: #fff;
+  letter-spacing: 1px;
+}
+
+.checkmark {
+  width: 72px;
+  height: 72px;
+  background: #16a34a;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 28px;
+  font-size: 36px;
+  color: #fff;
+  font-weight: bold;
+  animation: bounceIn 0.5s 0.2s both;
+}
+
+@keyframes bounceIn {
+  0%   { transform: scale(0); }
+  70%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.heading {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 36px;
+  letter-spacing: 3px;
+  color: #111;
+  margin-bottom: 16px;
+  line-height: 1.15;
+}
+
+.sub {
+  font-family: 'Barlow', sans-serif;
+  font-size: 16px;
+  color: #444;
+  margin-bottom: 14px;
+  line-height: 1.6;
+}
+
+.desc {
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  color: #888;
+  line-height: 1.7;
+  margin-bottom: 36px;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.primaryBtn {
+  width: 100%;
+  background: #111;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 18px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  letter-spacing: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.primaryBtn:hover { background: #333; }
+
+.secondaryBtn {
+  width: 100%;
+  background: transparent;
+  color: #666;
+  border: 1.5px solid #ddd;
+  border-radius: 12px;
+  padding: 16px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  letter-spacing: 3px;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.secondaryBtn:hover { border-color: #999; color: #333; }

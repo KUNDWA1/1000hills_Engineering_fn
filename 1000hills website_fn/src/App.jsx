@@ -6,6 +6,7 @@ import ProductDetail from './components/ProductDetail/ProductDetail';
 import SearchPage from './components/SearchPage/SearchPage';
 import Cart from './components/Cart/Cart';
 import Footer from './components/Footer/Footer';
+import WelcomePage from './components/WelcomePage/WelcomePage';
 
 import { constructionToolsProducts } from './data/ConstructionTools_products';
 import { generatorsProducts } from './data/Generators & Power_products';
@@ -31,7 +32,7 @@ const categoryMeta = {
 };
 
 export default function App() {
-  // 'home' | 'category' | 'detail' | 'search'
+  // 'home' | 'category' | 'detail' | 'search' | 'welcome'
   const [activePage, setActivePage]       = useState('home');
   const [activeCategory, setActiveCategory] = useState('construction-tools');
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -39,6 +40,21 @@ export default function App() {
   const [categorySearch, setCategorySearch] = useState('');
   const [cart, setCart]                   = useState([]);
   const [cartOpen, setCartOpen]           = useState(false);
+  const [loggedInUser, setLoggedInUser]   = useState(null);
+
+  // ── Auth helpers ──
+  function handleLoginSuccess(user) {
+    setLoggedInUser(user);
+    setActivePage('welcome');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function handleLogout() {
+    localStorage.removeItem('1h_logged_in');
+    setLoggedInUser(null);
+    setActivePage('home');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
   // ── Cart helpers ──
   const addToCart = useCallback((product) => {
@@ -116,7 +132,13 @@ export default function App() {
         cartCount={cartCount}
         onCartOpen={() => setCartOpen(true)}
         onSearch={goSearch}
+        onLoginSuccess={handleLoginSuccess}
       />
+
+      {/* ── WELCOME PAGE ── */}
+      {activePage === 'welcome' && (
+        <WelcomePage user={loggedInUser} onGoHome={goHome} onLogout={handleLogout} />
+      )}
 
       {/* ── HOME PAGE ── */}
       {activePage === 'home' && (
@@ -196,7 +218,9 @@ export default function App() {
         />
       )}
 
-      <Footer onCategoryChange={goCategory} onGoHome={goHome} />
+      {activePage !== 'welcome' && (
+        <Footer onCategoryChange={goCategory} onGoHome={goHome} />
+      )}
 
       <Cart
         isOpen={cartOpen}

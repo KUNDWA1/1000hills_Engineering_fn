@@ -13,7 +13,7 @@ const categories = [
   { key: 'solar-energy', label: 'Solar & Energy', products: solarProducts },
 ];
 
-export default function Navbar({ activePage, activeCategory, onCategoryChange, onGoHome, cartCount, onCartOpen, onSearch }) {
+export default function Navbar({ activePage, activeCategory, onCategoryChange, onGoHome, cartCount, onCartOpen, onSearch, onLoginSuccess }) {
   const [inputVal, setInputVal] = useState('');
   const [authOpen, setAuthOpen] = useState(false);   // ← NEW
 
@@ -105,7 +105,7 @@ export default function Navbar({ activePage, activeCategory, onCategoryChange, o
       </div>
 
       {/* ── AUTH MODAL ── */}
-      <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} />   {/* ← NEW */}
+      <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} onLoginSuccess={onLoginSuccess} />   {/* ← NEW */}
 
     </header>
   );
