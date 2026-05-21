@@ -254,7 +254,207 @@
   gap: 24px;
 }
 
-/* ===== STATS ===== */
+/* ===== OVERVIEW — ENTERPRISE REDESIGN ===== */
+.financeRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.finCard {
+  background: #ffffff;
+  border: 1px solid #dedad3;
+  border-radius: 16px;
+  padding: 22px 20px 18px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.finCard:hover { transform: translateY(-3px); box-shadow: 0 8px 28px rgba(0,0,0,0.07); }
+
+.finCardAccent {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  border-radius: 16px 16px 0 0;
+}
+
+.finCardIcon {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  margin-bottom: 14px;
+}
+
+.finCardLabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #8a8680;
+  margin: 0 0 6px;
+}
+
+.finCardValue {
+  font-size: 22px;
+  font-weight: 800;
+  color: #1a1916;
+  margin: 0 0 6px;
+  line-height: 1.1;
+}
+
+.finCardSub {
+  font-size: 11.5px;
+  color: #8a8680;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.finCardTrend {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 20px;
+}
+
+.quickActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.qaBtn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px;
+  border-radius: 9px;
+  border: 1px solid #dedad3;
+  background: #f7f5f2;
+  color: #1a1916;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s;
+  white-space: nowrap;
+}
+.qaBtn:hover { background: #dedad3; border-color: #c8b090; }
+.qaBtnPrimary {
+  background: linear-gradient(135deg, #c8860a, #a06e08);
+  color: #fff;
+  border-color: transparent;
+}
+.qaBtnPrimary:hover { opacity: 0.88; background: linear-gradient(135deg, #c8860a, #a06e08); }
+
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.kpiCard {
+  background: #fff;
+  border: 1px solid #dedad3;
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.kpiIcon {
+  font-size: 22px;
+  width: 42px; height: 42px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+.kpiInfo {}
+.kpiValue { font-size: 18px; font-weight: 800; color: #1a1916; margin: 0 0 2px; }
+.kpiLabel { font-size: 11px; color: #8a8680; margin: 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+
+.threeCol {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+}
+
+.activityFeed { display: flex; flex-direction: column; gap: 2px; }
+
+.activityItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: 9px;
+  transition: background 0.15s;
+}
+.activityItem:hover { background: #f7f5f2; }
+
+.activityDot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+
+.activityText { flex: 1; font-size: 13px; color: #1a1916; margin: 0 0 2px; }
+.activityTime { font-size: 11px; color: #b8b4ae; }
+
+.pendingList { display: flex; flex-direction: column; gap: 10px; }
+
+.pendingItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #f7f5f2;
+  border-radius: 10px;
+  border-left: 3px solid #c8860a;
+}
+
+.pendingIcon { font-size: 18px; flex-shrink: 0; }
+.pendingInfo { flex: 1; }
+.pendingTitle { font-size: 13px; font-weight: 600; color: #1a1916; margin: 0 0 2px; }
+.pendingDesc  { font-size: 11.5px; color: #8a8680; margin: 0; }
+
+.pendingAction {
+  background: #c8860a;
+  border: none;
+  color: #fff;
+  padding: 5px 12px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: opacity 0.2s;
+}
+.pendingAction:hover { opacity: 0.85; }
+
+.expenseModal {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+@media (max-width: 1200px) {
+  .financeRow { grid-template-columns: repeat(2, 1fr); }
+  .kpiRow     { grid-template-columns: repeat(2, 1fr); }
+  .threeCol   { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .financeRow { grid-template-columns: 1fr; }
+  .kpiRow     { grid-template-columns: 1fr 1fr; }
+}
+
+/* ===== STATS (kept for other tabs) ===== */
 .statsRow {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
