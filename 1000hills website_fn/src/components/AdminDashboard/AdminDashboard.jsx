@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import styles from "./AdminDashboard.module.css";
-import { assignOrder } from "../../utils/orderStore";
+import { assignOrder, getOrders, getCustomerOrders, confirmAndAssignOrder } from "../../utils/orderStore";
 
 /* ── Seed vendors (always present) ──────────────────────── */
 const SEED_VENDORS = [
@@ -44,6 +44,7 @@ const mockCustomers = [
 ];
 
 const statusColors = {
+  Suspended: "#6b7280",
   Approved: "#22c55e", Pending: "#f59e0b", Rejected: "#ef4444",
   Available: "#22c55e", Busy: "#f59e0b", Offline: "#6b7280",
   Assigned: "#3b82f6", Processing: "#a855f7", Delivered: "#22c55e",
@@ -60,11 +61,20 @@ export default function AdminDashboard({ user, onLogout }) {
   const [assignModal, setAssignModal] = useState(false);
   const [assignForm, setAssignForm] = useState(EMPTY_ASSIGN);
   const [assignSuccess, setAssignSuccess] = useState(null);
+  const [customerOrders, setCustomerOrders] = useState(() => getCustomerOrders());
   const [vendorRequests, setVendorRequests] = useState(
     () => JSON.parse(localStorage.getItem('1h_vendor_requests') || '[]').filter(r => r.status === 'pending')
   );
   const [actionDone, setActionDone] = useState(null);
   const [allVendors, setAllVendors] = useState(loadAllVendors);
+  const [viewOrder, setViewOrder] = useState(null);
+  const [trackOrder, setTrackOrder] = useState(null); // { order, steps }
+  const [viewVendor, setViewVendor] = useState(null);       // vendor being viewed
+  const [suspendVendor, setSuspendVendor] = useState(null); // vendor pending suspension
+
+  // Always refresh customer orders on every tab change
+  useEffect(() => { setCustomerOrders(getCustomerOrders()); }, [activeTab]);
+
   // Refresh vendor list whenever an approval action fires
   useEffect(() => { setAllVendors(loadAllVendors()); }, [actionDone]);
 
@@ -89,6 +99,56 @@ export default function AdminDashboard({ user, onLogout }) {
     setTimeout(() => setActionDone(null), 4000);
   };
 
+  const handleSuspend = (vendor) => {
+    // For seed vendors: update in-memory only
+    setAllVendors(prev => prev.map(v => v.id === vendor.id ? { ...v, status: 'Suspended' } : v));
+    // For real vendors from localStorage: update their record
+    const userRecord = JSON.parse(localStorage.getItem('1h_user_' + vendor.email) || '{}');
+    if (userRecord.email) {
+      localStorage.setItem('1h_user_' + vendor.email, JSON.stringify({ ...userRecord, profileStatus: 'suspended' }));
+      const reqs = JSON.parse(localStorage.getItem('1h_vendor_requests') || '[]');
+      localStorage.setItem('1h_vendor_requests', JSON.stringify(
+        reqs.map(r => r.vendorEmail === vendor.email ? { ...r, status: 'suspended' } : r)
+      ));
+    }
+    setSuspendVendor(null);
+    setActionDone({ name: vendor.name, action: 'suspended' });
+    setTimeout(() => setActionDone(null), 4000);
+  };
+
+  const [expenseModal, setExpenseModal] = useState(false);
+  const [expenseForm, setExpenseForm] = useState({ label: '', amount: '', category: 'Vendor Payment' });
+  const [expenses, setExpenses] = useState(() => JSON.parse(localStorage.getItem('1h_expenses') || '[]'));
+
+  const saveExpense = () => {
+    if (!expenseForm.label.trim() || !expenseForm.amount) return;
+    const updated = [...expenses, { ...expenseForm, id: Date.now(), date: new Date().toISOString() }];
+    localStorage.setItem('1h_expenses', JSON.stringify(updated));
+    setExpenses(updated);
+    setExpenseForm({ label: '', amount: '', category: 'Vendor Payment' });
+    setExpenseModal(false);
+  };
+
+  const totalRevenue = customerOrders.filter(o => o.status === 'Delivered').reduce((s, o) => s + (o.total || 0), 0);
+  const totalExpenses = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const netProfit = totalRevenue - totalExpenses;
+  const pendingOrders = customerOrders.filter(o => o.status === 'Pending');
+  const assignedOrders = customerOrders.filter(o => o.status === 'Assigned');
+
+  // Recent activity feed from real events
+  const recentActivity = [
+    ...customerOrders.slice(-3).reverse().map(o => ({
+      text: `Order ${o.id} placed by ${o.customerName}`,
+      time: new Date(o.placedAt).toLocaleDateString(),
+      color: '#3b82f6',
+    })),
+    ...expenses.slice(-2).reverse().map(e => ({
+      text: `Expense recorded: ${e.label} — RWF ${Number(e.amount).toLocaleString()}`,
+      time: new Date(e.date).toLocaleDateString(),
+      color: '#ef4444',
+    })),
+  ].slice(0, 6);
+
   /* ── Assign form helpers ── */
   const openAssignModal = (order) => {
     setSelectedOrder(order);
@@ -96,7 +156,9 @@ export default function AdminDashboard({ user, onLogout }) {
       vendorId: "",
       deliveryDate: "",
       description: "",
-      products: [{ name: order.product || "", qty: order.qty || "", unitPrice: "" }],
+      products: order.items
+        ? order.items.map(i => ({ name: i.name, qty: i.qty, unitPrice: i.price || '' }))
+        : [{ name: order.product || "", qty: order.qty || "", unitPrice: "" }],
     });
     setAssignModal(true);
   };
@@ -128,41 +190,37 @@ export default function AdminDashboard({ user, onLogout }) {
     const vendor = allVendors.find(v => v.id === assignForm.vendorId);
     if (!vendor || !assignForm.deliveryDate) return;
 
-    const order = {
+    // Order sent to vendor — NO customer name/ID
+    const vendorOrder = {
       id: selectedOrder.id,
-      customer: selectedOrder.customer,
       vendorEmail: vendor.email,
       vendorName: vendor.name,
       deliveryDate: assignForm.deliveryDate,
       description: assignForm.description,
       products: assignForm.products,
       total: calcTotal() || selectedOrder.total,
-      status: "Assigned",
-      vendorStatus: "pending", // pending | accepted | rejected
+      status: 'Assigned',
+      vendorStatus: 'pending',
       assignedAt: new Date().toISOString(),
     };
 
-    assignOrder(order);
+    assignOrder(vendorOrder);
+    // Update customer order status
+    confirmAndAssignOrder(selectedOrder.id, { vendorName: vendor.name, deliveryDate: assignForm.deliveryDate });
+    setCustomerOrders(getCustomerOrders());
     setAssignModal(false);
     setAssignSuccess(`Order ${selectedOrder.id} assigned to ${vendor.name}`);
     setTimeout(() => setAssignSuccess(null), 4000);
   };
 
-  const stats = [
-    { label: "Total Vendors", value: "18", icon: "🏭", change: "3 pending approval", color: "#f97316" },
-    { label: "Total Customers", value: "134", icon: "👥", change: "+12 this month", color: "#3b82f6" },
-    { label: "Orders Today", value: "7", icon: "📋", change: "2 unassigned", color: "#a855f7" },
-    { label: "Revenue (RWF)", value: "21.4M", icon: "💰", change: "+24% vs last month", color: "#22c55e" },
-  ];
-
   const navItems = [
-    { id: "overview",  label: "Overview",         icon: "⊞" },
-    { id: "orders",    label: "Order Management", icon: "📋" },
-    { id: "vendors",   label: "Vendor Management",icon: "🏭" },
-    { id: "customers", label: "Customers",        icon: "👥" },
-    { id: "approvals", label: "Approvals",        icon: "✅", badge: vendorRequests.length },
-    { id: "payments",  label: "Payments",         icon: "💳" },
-    { id: "analytics", label: "Analytics",        icon: "📊" },
+    { id: "overview",    label: "Overview",                icon: "⊞" },
+    { id: "orders",      label: "Customer Order Management", icon: "📋" },
+    { id: "ordertrack",  label: "Order Track",             icon: "🚚" },
+    { id: "vendors",     label: "Vendor Management",       icon: "🏭" },
+    { id: "approvals",   label: "Approvals",               icon: "✅", badge: vendorRequests.length },
+    { id: "payments",    label: "Payments",                icon: "💳" },
+    { id: "analytics",   label: "Analytics",               icon: "📊" },
   ];
 
   return (
@@ -234,8 +292,8 @@ export default function AdminDashboard({ user, onLogout }) {
 
           {/* ── TOASTS ── */}
           {actionDone && (
-            <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 200, background: actionDone.action === 'approved' ? '#2a7d3f' : '#ef4444', color: '#fff', padding: '14px 22px', borderRadius: 12, fontWeight: 600, fontSize: 14, boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
-              {actionDone.action === 'approved' ? '✓' : '✗'} {actionDone.name} has been <strong>{actionDone.action}</strong>
+            <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 200, background: actionDone.action === 'approved' ? '#2a7d3f' : actionDone.action === 'suspended' ? '#6b7280' : '#ef4444', color: '#fff', padding: '14px 22px', borderRadius: 12, fontWeight: 600, fontSize: 14, boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
+              {actionDone.action === 'approved' ? '✓' : actionDone.action === 'suspended' ? '⏸' : '✗'} {actionDone.name} has been <strong>{actionDone.action}</strong>
             </div>
           )}
           {assignSuccess && (
@@ -245,76 +303,238 @@ export default function AdminDashboard({ user, onLogout }) {
           )}
 
           {/* ── OVERVIEW ── */}
-          {activeTab === "overview" && (
+          {activeTab === 'overview' && (
             <div className={styles.overviewGrid}>
-              <div className={styles.statsRow}>
-                {stats.map((s, i) => (
-                  <div className={styles.statCard} key={i} style={{ "--accent": s.color }}>
-                    <div className={styles.statIcon} style={{ background: s.color + "18", color: s.color }}>{s.icon}</div>
-                    <div>
-                      <p className={styles.statValue}>{s.value}</p>
-                      <p className={styles.statLabel}>{s.label}</p>
-                      <p className={styles.statChange}>{s.change}</p>
+
+              {/* ── FINANCE CARDS ── */}
+              <div className={styles.financeRow}>
+
+                {/* Revenue */}
+                <div className={styles.finCard}>
+                  <div className={styles.finCardAccent} style={{ background: 'linear-gradient(90deg,#22c55e,#16a34a)' }} />
+                  <div className={styles.finCardIcon} style={{ background: '#22c55e18', color: '#22c55e' }}>💰</div>
+                  <p className={styles.finCardLabel}>Total Revenue</p>
+                  <p className={styles.finCardValue}>RWF {totalRevenue.toLocaleString()}</p>
+                  <p className={styles.finCardSub}>
+                    <span className={styles.finCardTrend} style={{ background: '#22c55e18', color: '#22c55e' }}>↑ Delivered orders</span>
+                    <span>incoming cash flow</span>
+                  </p>
+                </div>
+
+                {/* Expenses */}
+                <div className={styles.finCard}>
+                  <div className={styles.finCardAccent} style={{ background: 'linear-gradient(90deg,#ef4444,#dc2626)' }} />
+                  <div className={styles.finCardIcon} style={{ background: '#ef444418', color: '#ef4444' }}>📤</div>
+                  <p className={styles.finCardLabel}>Total Expenses</p>
+                  <p className={styles.finCardValue}>RWF {totalExpenses.toLocaleString()}</p>
+                  <p className={styles.finCardSub}>
+                    <span className={styles.finCardTrend} style={{ background: '#ef444418', color: '#ef4444' }}>{expenses.length} entries</span>
+                    <span>vendor &amp; operational</span>
+                  </p>
+                </div>
+
+                {/* Net Profit */}
+                <div className={styles.finCard}>
+                  <div className={styles.finCardAccent} style={{ background: netProfit >= 0 ? 'linear-gradient(90deg,#3b82f6,#1d4ed8)' : 'linear-gradient(90deg,#f59e0b,#d97706)' }} />
+                  <div className={styles.finCardIcon} style={{ background: netProfit >= 0 ? '#3b82f618' : '#f59e0b18', color: netProfit >= 0 ? '#3b82f6' : '#f59e0b' }}>
+                    {netProfit >= 0 ? '📈' : '📉'}
+                  </div>
+                  <p className={styles.finCardLabel}>Net {netProfit >= 0 ? 'Profit' : 'Loss'}</p>
+                  <p className={styles.finCardValue} style={{ color: netProfit >= 0 ? '#22c55e' : '#ef4444' }}>
+                    {netProfit >= 0 ? '+' : ''}RWF {netProfit.toLocaleString()}
+                  </p>
+                  <p className={styles.finCardSub}>
+                    <span className={styles.finCardTrend} style={{ background: netProfit >= 0 ? '#22c55e18' : '#ef444418', color: netProfit >= 0 ? '#22c55e' : '#ef4444' }}>
+                      {netProfit >= 0 ? '✓ Profitable' : '⚠ Loss'}
+                    </span>
+                    <span>Revenue minus expenses</span>
+                  </p>
+                </div>
+
+                {/* Quick Actions */}
+                <div className={styles.finCard}>
+                  <div className={styles.finCardAccent} style={{ background: 'linear-gradient(90deg,#c8860a,#a06e08)' }} />
+                  <div className={styles.finCardIcon} style={{ background: '#c8860a18', color: '#c8860a' }}>⚡</div>
+                  <p className={styles.finCardLabel}>Quick Actions</p>
+                  <div className={styles.quickActions}>
+                    <button className={`${styles.qaBtn} ${styles.qaBtnPrimary}`} onClick={() => setExpenseModal(true)}>+ Add Expense</button>
+                    <button className={styles.qaBtn} onClick={() => setActiveTab('orders')}>📋 Orders</button>
+                    <button className={styles.qaBtn} onClick={() => setActiveTab('ordertrack')}>🚚 Track</button>
+                    <button className={styles.qaBtn} onClick={() => {
+                      const rows = customerOrders.map(o => `${o.id},${o.customerName},${o.status},${o.total}`).join('\n');
+                      const blob = new Blob([`Order ID,Customer,Status,Total\n${rows}`], { type: 'text/csv' });
+                      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '1000hills_orders.csv'; a.click();
+                    }}>⬇ Export CSV</button>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── KPI ROW ── */}
+              <div className={styles.kpiRow}>
+                {[
+                  { icon: '📦', label: 'Total Orders', value: customerOrders.length, color: '#3b82f6' },
+                  { icon: '⏳', label: 'Pending Assignment', value: pendingOrders.length, color: '#f59e0b' },
+                  { icon: '🚚', label: 'In Transit', value: assignedOrders.length + customerOrders.filter(o => o.status === 'Processing' || o.status === 'Out for Delivery').length, color: '#a855f7' },
+                  { icon: '✅', label: 'Delivered', value: customerOrders.filter(o => o.status === 'Delivered').length, color: '#22c55e' },
+                  { icon: '🏭', label: 'Active Vendors', value: allVendors.filter(v => v.status === 'Approved').length, color: '#f97316' },
+                  { icon: '✅', label: 'Pending Approvals', value: vendorRequests.length, color: '#ef4444' },
+                  { icon: '💳', label: 'Expense Entries', value: expenses.length, color: '#06b6d4' },
+                  { icon: '📊', label: 'Fulfillment Rate', value: customerOrders.length ? Math.round((customerOrders.filter(o => o.status === 'Delivered').length / customerOrders.length) * 100) + '%' : '0%', color: '#22c55e' },
+                ].map((k, i) => (
+                  <div className={styles.kpiCard} key={i}>
+                    <div className={styles.kpiIcon} style={{ background: k.color + '18', color: k.color }}>{k.icon}</div>
+                    <div className={styles.kpiInfo}>
+                      <p className={styles.kpiValue}>{k.value}</p>
+                      <p className={styles.kpiLabel}>{k.label}</p>
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className={styles.alertBanner}>
-                <span className={styles.alertIcon}>⚡</span>
-                <span className={styles.alertText}>
-                  <strong>2 orders are waiting for vendor assignment</strong> — Review and assign them now to avoid delays.
-                </span>
-                <button className={styles.alertBtn} onClick={() => setActiveTab("orders")}>Assign Now →</button>
-              </div>
-
-              <div className={styles.card}>
-                <div className={styles.cardHeader}>
-                  <h2 className={styles.cardTitle}>Recent Orders</h2>
-                  <button className={styles.viewAllBtn} onClick={() => setActiveTab("orders")}>View All →</button>
+              {/* ── ALERT BANNER ── */}
+              {pendingOrders.length > 0 && (
+                <div className={styles.alertBanner}>
+                  <span className={styles.alertIcon}>⚡</span>
+                  <span className={styles.alertText}>
+                    <strong>{pendingOrders.length} order{pendingOrders.length !== 1 ? 's are' : ' is'} waiting for vendor assignment</strong> — Review and assign them now to avoid delays.
+                  </span>
+                  <button className={styles.alertBtn} onClick={() => setActiveTab('orders')}>Assign Now →</button>
                 </div>
-                <OrderTable orders={mockOrders.slice(0, 4)} onAssign={openAssignModal} styles={styles} />
-              </div>
+              )}
 
-              <div className={styles.twoCol}>
-                <div className={styles.card}>
-                  <div className={styles.cardHeader}>
-                    <h2 className={styles.cardTitle}>Pending Vendor Requests</h2>
-                    <button className={styles.viewAllBtn} onClick={() => setActiveTab("approvals")}>View All →</button>
-                  </div>
-                  {vendorRequests.length === 0
-                    ? <p style={{ color: '#8a8680', fontSize: 13 }}>No pending requests</p>
-                    : vendorRequests.slice(0, 2).map((v) => (
-                      <div className={styles.requestCard} key={v.vendorEmail}>
-                        <div className={styles.requestAvatar}>{(v.companyName || v.vendorName || '??').slice(0, 2).toUpperCase()}</div>
-                        <div className={styles.requestInfo}>
-                          <p className={styles.requestName}>{v.companyName || v.vendorName}</p>
-                          <p className={styles.requestSub}>{v.location} · {new Date(v.submittedAt).toLocaleDateString()}</p>
-                        </div>
-                        <div className={styles.requestActions}>
-                          <button className={styles.approveBtn} onClick={() => handleApprove(v)}>✓ Approve</button>
-                          <button className={styles.rejectBtn} onClick={() => handleReject(v)}>✗ Reject</button>
-                        </div>
+              {/* ── MAIN CONTENT ROW ── */}
+              <div className={styles.threeCol}>
+
+                {/* Left: Recent Orders + Vendor Ranking */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+                  {/* Recent Orders */}
+                  <div className={styles.card}>
+                    <div className={styles.cardHeader}>
+                      <h2 className={styles.cardTitle} style={{ margin: 0 }}>Recent Orders</h2>
+                      <button className={styles.viewAllBtn} onClick={() => setActiveTab('orders')}>View All →</button>
+                    </div>
+                    {customerOrders.length === 0 ? (
+                      <p style={{ color: '#8a8680', fontSize: 13 }}>No orders yet.</p>
+                    ) : (
+                      <div className={styles.tableWrap}>
+                        <table className={styles.table}>
+                          <thead><tr><th>Order ID</th><th>Customer</th><th>Total (RWF)</th><th>Status</th><th>Date</th></tr></thead>
+                          <tbody>
+                            {customerOrders.slice(-5).reverse().map(o => (
+                              <tr key={o.id}>
+                                <td className={styles.orderId}>{o.id}</td>
+                                <td>{o.customerName}</td>
+                                <td className={styles.amount}>{o.total?.toLocaleString()}</td>
+                                <td><span className={styles.statusPill} style={{ background: (statusColors[o.status] || '#f59e0b') + '22', color: statusColors[o.status] || '#f59e0b' }}>{o.status}</span></td>
+                                <td className={styles.dateCell}>{new Date(o.placedAt).toLocaleDateString()}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
-                    ))}
+                    )}
+                  </div>
+
+                  {/* Vendor Performance */}
+                  <div className={styles.card}>
+                    <div className={styles.cardHeader}>
+                      <h2 className={styles.cardTitle} style={{ margin: 0 }}>Vendor Performance</h2>
+                      <button className={styles.viewAllBtn} onClick={() => setActiveTab('vendors')}>View All →</button>
+                    </div>
+                    <div className={styles.vendorRankList}>
+                      {allVendors.filter(v => v.reliability).sort((a, b) => b.reliability - a.reliability).map((v, i) => (
+                        <div className={styles.vendorRankItem} key={v.id}>
+                          <span className={styles.rankNum}>#{i + 1}</span>
+                          <div className={styles.rankInfo}>
+                            <p className={styles.rankName}>{v.name}</p>
+                            <div className={styles.reliabilityBar}>
+                              <div className={styles.reliabilityFill} style={{ width: v.reliability + '%', background: v.reliability > 90 ? '#22c55e' : v.reliability > 75 ? '#f59e0b' : '#ef4444' }} />
+                            </div>
+                          </div>
+                          <span className={styles.reliabilityScore} style={{ color: v.reliability > 90 ? '#22c55e' : v.reliability > 75 ? '#f59e0b' : '#ef4444' }}>{v.reliability}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
-                <div className={styles.card}>
-                  <h2 className={styles.cardTitle}>Top Vendors by Reliability</h2>
-                  <div className={styles.vendorRankList}>
-                    {allVendors.filter(v => v.reliability).sort((a, b) => b.reliability - a.reliability).map((v, i) => (
-                      <div className={styles.vendorRankItem} key={v.id}>
-                        <span className={styles.rankNum}>#{i + 1}</span>
-                        <div className={styles.rankInfo}>
-                          <p className={styles.rankName}>{v.name}</p>
-                          <div className={styles.reliabilityBar}>
-                            <div className={styles.reliabilityFill} style={{ width: v.reliability + "%", background: v.reliability > 90 ? "#22c55e" : v.reliability > 75 ? "#f59e0b" : "#ef4444" }} />
+                {/* Right: Pending Actions + Activity Feed */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+                  {/* Pending Actions */}
+                  <div className={styles.card}>
+                    <h2 className={styles.cardTitle}>Pending Actions</h2>
+                    <div className={styles.pendingList}>
+                      {pendingOrders.length > 0 && (
+                        <div className={styles.pendingItem}>
+                          <span className={styles.pendingIcon}>📋</span>
+                          <div className={styles.pendingInfo}>
+                            <p className={styles.pendingTitle}>{pendingOrders.length} Unassigned Order{pendingOrders.length !== 1 ? 's' : ''}</p>
+                            <p className={styles.pendingDesc}>Awaiting vendor assignment</p>
+                          </div>
+                          <button className={styles.pendingAction} onClick={() => setActiveTab('orders')}>Assign</button>
+                        </div>
+                      )}
+                      {vendorRequests.length > 0 && (
+                        <div className={styles.pendingItem} style={{ borderLeftColor: '#3b82f6' }}>
+                          <span className={styles.pendingIcon}>🏭</span>
+                          <div className={styles.pendingInfo}>
+                            <p className={styles.pendingTitle}>{vendorRequests.length} Vendor Approval{vendorRequests.length !== 1 ? 's' : ''}</p>
+                            <p className={styles.pendingDesc}>Awaiting review</p>
+                          </div>
+                          <button className={styles.pendingAction} style={{ background: '#3b82f6' }} onClick={() => setActiveTab('approvals')}>Review</button>
+                        </div>
+                      )}
+                      {pendingOrders.length === 0 && vendorRequests.length === 0 && (
+                        <p style={{ color: '#8a8680', fontSize: 13 }}>✓ No pending actions</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Pending Vendor Requests */}
+                  {vendorRequests.length > 0 && (
+                    <div className={styles.card}>
+                      <div className={styles.cardHeader}>
+                        <h2 className={styles.cardTitle} style={{ margin: 0 }}>New Vendor Requests</h2>
+                        <button className={styles.viewAllBtn} onClick={() => setActiveTab('approvals')}>View All →</button>
+                      </div>
+                      {vendorRequests.slice(0, 2).map(v => (
+                        <div className={styles.requestCard} key={v.vendorEmail}>
+                          <div className={styles.requestAvatar}>{(v.companyName || v.vendorName || '??').slice(0, 2).toUpperCase()}</div>
+                          <div className={styles.requestInfo}>
+                            <p className={styles.requestName}>{v.companyName || v.vendorName}</p>
+                            <p className={styles.requestSub}>{v.location} · {new Date(v.submittedAt).toLocaleDateString()}</p>
+                          </div>
+                          <div className={styles.requestActions}>
+                            <button className={styles.approveBtn} onClick={() => handleApprove(v)}>✓</button>
+                            <button className={styles.rejectBtn} onClick={() => handleReject(v)}>✗</button>
                           </div>
                         </div>
-                        <span className={styles.reliabilityScore} style={{ color: v.reliability > 90 ? "#22c55e" : v.reliability > 75 ? "#f59e0b" : "#ef4444" }}>{v.reliability}%</span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Recent Activity */}
+                  <div className={styles.card}>
+                    <h2 className={styles.cardTitle}>Recent Activity</h2>
+                    {recentActivity.length === 0 ? (
+                      <p style={{ color: '#8a8680', fontSize: 13 }}>No recent activity.</p>
+                    ) : (
+                      <div className={styles.activityFeed}>
+                        {recentActivity.map((a, i) => (
+                          <div className={styles.activityItem} key={i}>
+                            <div className={styles.activityDot} style={{ background: a.color }} />
+                            <div>
+                              <p className={styles.activityText}>{a.text}</p>
+                              <span className={styles.activityTime}>{a.time}</span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
+
                 </div>
               </div>
             </div>
@@ -325,14 +545,119 @@ export default function AdminDashboard({ user, onLogout }) {
             <div className={styles.tabContent}>
               <div className={styles.tabActions}>
                 <input className={styles.searchInput} placeholder="🔍  Search orders..." />
-                <select className={styles.filterSelect}><option>All Statuses</option><option>Pending</option><option>Assigned</option><option>Processing</option><option>Delivered</option></select>
-                <select className={styles.filterSelect}><option>All Dates</option><option>Today</option><option>This Week</option><option>This Month</option></select>
+                <select className={styles.filterSelect}>
+                  <option>All Statuses</option><option>Pending</option><option>Assigned</option><option>Processing</option><option>Delivered</option>
+                </select>
               </div>
               <div className={styles.card}>
-                <OrderTable orders={mockOrders} onAssign={openAssignModal} styles={styles} showAll />
+                {customerOrders.length === 0 ? (
+                  <div className={styles.emptyState}>
+                    <span className={styles.emptyIcon}>📋</span>
+                    <p>No customer orders yet.</p>
+                  </div>
+                ) : (
+                  <div className={styles.tableWrap}>
+                    <table className={styles.table}>
+                      <thead>
+                        <tr>
+                          <th>Order ID</th>
+                          <th>Customer</th>
+                          <th>Items</th>
+                          <th>Total (RWF)</th>
+                          <th>Vendor Assigned</th>
+                          <th>Status</th>
+                          <th>Date</th>
+                          <th>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {customerOrders.map(o => (
+                          <tr key={o.id}>
+                            <td className={styles.orderId}>{o.id}</td>
+                            <td>{o.customerName}</td>
+                            <td style={{ fontSize: 12, color: '#8a8680' }}>
+                              {o.items?.map(i => `${i.name} x${i.qty}`).join(', ')}
+                            </td>
+                            <td className={styles.amount}>{o.total?.toLocaleString()}</td>
+                            <td>
+                              {o.vendorName
+                                ? <span className={styles.vendorAssigned}>{o.vendorName}</span>
+                                : <span className={styles.unassignedTag}>Not Assigned</span>}
+                            </td>
+                            <td>
+                              <span className={styles.statusPill} style={{
+                                background: (statusColors[o.status] || '#f59e0b') + '22',
+                                color: statusColors[o.status] || '#f59e0b'
+                              }}>{o.status}</span>
+                            </td>
+                            <td className={styles.dateCell}>{new Date(o.placedAt).toLocaleDateString()}</td>
+                            <td>
+                              {o.status === 'Pending'
+                                ? <button className={styles.assignBtn} onClick={() => openAssignModal(o)}>⚡ Assign</button>
+                                : <button className={styles.editBtn} onClick={() => setViewOrder(o)}>👁 View</button>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           )}
+
+          {/* ── ORDER TRACK ── */}
+          {activeTab === 'ordertrack' && (() => {
+            const trackedOrders = getCustomerOrders().filter(o => ['Assigned','Processing','Out for Delivery','Delivered'].includes(o.status));
+            const TRACK_STEPS = ['Assigned','Processing','Out for Delivery','Delivered'];
+            return (
+              <div className={styles.tabContent}>
+                {trackedOrders.length === 0 ? (
+                  <div className={styles.emptyState}>
+                    <span className={styles.emptyIcon}>🚚</span>
+                    <p>No orders in tracking yet. Assign an order to a vendor first.</p>
+                  </div>
+                ) : (
+                  <div className={styles.card}>
+                    <div className={styles.tableWrap}>
+                      <table className={styles.table}>
+                        <thead>
+                          <tr>
+                            <th>Order ID</th>
+                            <th>Customer</th>
+                            <th>Vendor</th>
+                            <th>Delivery By</th>
+                            <th>Total (RWF)</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {trackedOrders.map(o => (
+                            <tr key={o.id}>
+                              <td className={styles.orderId}>{o.id}</td>
+                              <td>{o.customerName}</td>
+                              <td className={styles.vendorAssigned}>{o.vendorName || '—'}</td>
+                              <td className={styles.dateCell}>{o.deliveryDate || '—'}</td>
+                              <td className={styles.amount}>{(() => { const vo = getOrders().find(x => x.id === o.id); return (vo?.total ?? o.total)?.toLocaleString(); })()}</td>
+                              <td>
+                                <span className={styles.statusPill} style={{ background: (statusColors[o.status] || '#f59e0b') + '22', color: statusColors[o.status] || '#f59e0b' }}>
+                                  {o.status}
+                                </span>
+                              </td>
+                              <td>
+                                <button className={styles.editBtn} onClick={() => setTrackOrder({ order: o, steps: TRACK_STEPS })}>👁 View</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* ── VENDOR MANAGEMENT ── */}
           {activeTab === "vendors" && (
@@ -368,38 +693,14 @@ export default function AdminDashboard({ user, onLogout }) {
                           <td><span className={styles.statusPill} style={{ background: statusColors[v.availability] + "22", color: statusColors[v.availability] }}>{v.availability}</span></td>
                           <td><span className={styles.statusPill} style={{ background: statusColors[v.status] + "22", color: statusColors[v.status] }}>{v.status}</span></td>
                           <td className={styles.actionsCell}>
-                            <button className={styles.editBtn}>👁 View</button>
-                            {v.status === "Approved" && <button className={styles.deleteBtn}>✗ Suspend</button>}
+                            <button className={styles.editBtn} onClick={() => setViewVendor(v)}>👁 View</button>
+                            {v.status === 'Approved' && (
+                              <button className={styles.deleteBtn} onClick={() => setSuspendVendor(v)}>✗ Suspend</button>
+                            )}
+                            {v.status === 'Suspended' && (
+                              <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>Suspended</span>
+                            )}
                           </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── CUSTOMERS ── */}
-          {activeTab === "customers" && (
-            <div className={styles.tabContent}>
-              <div className={styles.tabActions}>
-                <input className={styles.searchInput} placeholder="🔍  Search customers..." />
-              </div>
-              <div className={styles.card}>
-                <div className={styles.tableWrap}>
-                  <table className={styles.table}>
-                    <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Orders</th><th>Total Spent (RWF)</th><th>Joined</th><th>Actions</th></tr></thead>
-                    <tbody>
-                      {mockCustomers.map((c) => (
-                        <tr key={c.id}>
-                          <td className={styles.orderId}>{c.id}</td>
-                          <td className={styles.productName}>{c.name}</td>
-                          <td className={styles.dateCell}>{c.email}</td>
-                          <td>{c.orders}</td>
-                          <td className={styles.amount}>{c.totalSpent.toLocaleString()}</td>
-                          <td className={styles.dateCell}>{c.joined}</td>
-                          <td><button className={styles.editBtn}>👁 View</button></td>
                         </tr>
                       ))}
                     </tbody>
@@ -560,7 +861,301 @@ export default function AdminDashboard({ user, onLogout }) {
         </div>
       </main>
 
-      {/* ── ASSIGN VENDOR MODAL (NEW) ── */}
+      {/* ── ADD EXPENSE MODAL ── */}
+      {expenseModal && (
+        <div className={styles.modalOverlay} onClick={() => setExpenseModal(false)}>
+          <div className={styles.modal} style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Add Expense</h2>
+              <button className={styles.modalClose} onClick={() => setExpenseModal(false)}>✕</button>
+            </div>
+            <div className={styles.modalBody}>
+              <div className={styles.expenseModal}>
+                <div>
+                  <label className={styles.modalSubtitle} style={{ display: 'block', marginBottom: 6 }}>Category</label>
+                  <select className={styles.filterSelect} style={{ width: '100%' }} value={expenseForm.category} onChange={e => setExpenseForm(p => ({ ...p, category: e.target.value }))}>
+                    {['Vendor Payment','Salary','Logistics','Operations','Marketing','Other'].map(c => <option key={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={styles.modalSubtitle} style={{ display: 'block', marginBottom: 6 }}>Description</label>
+                  <input className={styles.searchInput} style={{ width: '100%', boxSizing: 'border-box' }} placeholder='e.g. Payment to Rwanda Builders Ltd' value={expenseForm.label} onChange={e => setExpenseForm(p => ({ ...p, label: e.target.value }))} />
+                </div>
+                <div>
+                  <label className={styles.modalSubtitle} style={{ display: 'block', marginBottom: 6 }}>Amount (RWF)</label>
+                  <input type='number' min='0' className={styles.searchInput} style={{ width: '100%', boxSizing: 'border-box' }} placeholder='e.g. 500000' value={expenseForm.amount} onChange={e => setExpenseForm(p => ({ ...p, amount: e.target.value }))} />
+                </div>
+              </div>
+            </div>
+            <div className={styles.modalFooter}>
+              <button className={styles.cancelBtn} onClick={() => setExpenseModal(false)}>Cancel</button>
+              <button className={styles.primaryBtn} onClick={saveExpense} disabled={!expenseForm.label.trim() || !expenseForm.amount} style={{ opacity: (!expenseForm.label.trim() || !expenseForm.amount) ? 0.5 : 1 }}>Save Expense</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── TRACK ORDER MODAL ── */}
+      {trackOrder && (() => {
+        const { order: o, steps: TRACK_STEPS } = trackOrder;
+        const stepIdx = TRACK_STEPS.indexOf(o.status);
+        return (
+          <div className={styles.modalOverlay} onClick={() => setTrackOrder(null)}>
+            <div className={styles.modal} style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
+              <div className={styles.modalHeader}>
+                <h2 className={styles.modalTitle}>Order Track — {o.id}</h2>
+                <button className={styles.modalClose} onClick={() => setTrackOrder(null)}>✕</button>
+              </div>
+              <div className={styles.modalBody}>
+
+                {/* Summary */}
+                <div style={{ background: '#f7f5f2', borderRadius: 10, padding: '12px 16px', marginBottom: 20, fontSize: 13, color: '#8a8680' }}>
+                  <span style={{ fontFamily: 'monospace', color: '#c8860a', fontWeight: 700 }}>{o.id}</span>
+                  <span style={{ marginLeft: 10 }}>{new Date(o.placedAt).toLocaleDateString()}</span>
+                  <div style={{ marginTop: 6 }}>
+                    Customer: <strong style={{ color: '#1a1916' }}>{o.customerName}</strong>
+                    {o.vendorName && <> &nbsp;·&nbsp; Vendor: <strong style={{ color: '#1a1916' }}>{o.vendorName}</strong></>}
+                    {o.deliveryDate && <> &nbsp;·&nbsp; Delivery by: <strong style={{ color: '#1a1916' }}>{o.deliveryDate}</strong></>}
+                  </div>
+                </div>
+
+                {/* Stepper */}
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
+                  {TRACK_STEPS.map((step, i) => (
+                    <>
+                      <div key={step} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                        <div style={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: i <= stepIdx ? '#c8860a' : '#f0ede8', color: i <= stepIdx ? '#fff' : '#b8b4ae', fontWeight: 700, fontSize: 13, border: i === stepIdx ? '2px solid #a06e08' : '2px solid transparent' }}>
+                          {i < stepIdx ? '✓' : i + 1}
+                        </div>
+                        <span style={{ fontSize: 10, color: i <= stepIdx ? '#c8860a' : '#b8b4ae', fontWeight: i === stepIdx ? 700 : 400, whiteSpace: 'nowrap' }}>{step}</span>
+                      </div>
+                      {i < TRACK_STEPS.length - 1 && (
+                        <div key={step + '-line'} style={{ flex: 1, height: 3, background: i < stepIdx ? '#c8860a' : '#f0ede8', margin: '0 4px', marginBottom: 18, borderRadius: 4 }} />
+                      )}
+                    </>
+                  ))}
+                </div>
+
+                {/* Items — use vendor order prices from 1h_orders */}
+                {(() => {
+                  const vendorOrder = getOrders().find(x => x.id === o.id);
+                  const products = vendorOrder?.products || o.items;
+                  const total = vendorOrder?.total ?? o.total;
+                  return (
+                    <>
+                      <p style={{ margin: '0 0 10px', fontSize: 11, color: '#8a8680', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Items</p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                        {products?.map((item, i) => {
+                          const qty = Number(item.qty) || 0;
+                          const unitPrice = Number(item.unitPrice ?? item.price) || 0;
+                          return (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', background: '#f7f5f2', borderRadius: 8, padding: '10px 14px' }}>
+                              <span style={{ fontSize: 13.5, fontWeight: 500, color: '#1a1916' }}>{item.name} <span style={{ color: '#8a8680', fontWeight: 400 }}>x{qty}</span></span>
+                              <strong style={{ color: '#2a7d3f', fontSize: 13 }}>RWF {(qty * unitPrice).toLocaleString()}</strong>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderTop: '1px solid #dedad3', marginBottom: 16 }}>
+                        <span style={{ fontSize: 13, color: '#8a8680', fontWeight: 600 }}>Total</span>
+                        <strong style={{ fontSize: 15, color: '#2a7d3f' }}>RWF {Number(total)?.toLocaleString()}</strong>
+                      </div>
+                    </>
+                  );
+                })()}
+
+                {/* Update status */}
+                {o.status !== 'Delivered' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, color: '#8a8680' }}>Update status:</span>
+                    {TRACK_STEPS.filter((_, i) => i > stepIdx).map(nextStep => (
+                      <button
+                        key={nextStep}
+                        onClick={() => {
+                          const all = getCustomerOrders();
+                          localStorage.setItem('1h_customer_orders', JSON.stringify(
+                            all.map(x => x.id === o.id ? { ...x, status: nextStep } : x)
+                          ));
+                          setCustomerOrders(getCustomerOrders());
+                          setTrackOrder({ order: { ...o, status: nextStep }, steps: TRACK_STEPS });
+                        }}
+                        style={{ background: '#c8860a18', border: '1px solid #c8860a40', color: '#c8860a', padding: '6px 16px', borderRadius: 7, cursor: 'pointer', fontSize: 12.5, fontWeight: 600 }}
+                      >
+                        Mark as {nextStep}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {o.status === 'Delivered' && (
+                  <p style={{ color: '#22c55e', fontWeight: 600, fontSize: 13 }}>✓ This order has been delivered.</p>
+                )}
+              </div>
+              <div className={styles.modalFooter}>
+                <button className={styles.primaryBtn} onClick={() => setTrackOrder(null)}>Close</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── VIEW ORDER MODAL ── */}
+      {viewOrder && (
+        <div className={styles.modalOverlay} onClick={() => setViewOrder(null)}>
+          <div className={styles.modal} style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Order Details — {viewOrder.id}</h2>
+              <button className={styles.modalClose} onClick={() => setViewOrder(null)}>✕</button>
+            </div>
+            <div className={styles.modalBody}>
+
+              {/* Status + date */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <span className={styles.statusPill} style={{ background: (statusColors[viewOrder.status] || '#f59e0b') + '22', color: statusColors[viewOrder.status] || '#f59e0b', fontSize: 13 }}>
+                  {viewOrder.status}
+                </span>
+                <span style={{ fontSize: 12, color: '#b8b4ae' }}>Placed: {new Date(viewOrder.placedAt).toLocaleDateString()}</span>
+              </div>
+
+              {/* Customer info */}
+              <div style={{ background: '#f7f5f2', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
+                <p style={{ margin: '0 0 4px', fontSize: 11, color: '#8a8680', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Customer</p>
+                <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#1a1916' }}>{viewOrder.customerName}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 12, color: '#8a8680' }}>{viewOrder.customerEmail}</p>
+              </div>
+
+              {/* Items */}
+              <p style={{ margin: '0 0 10px', fontSize: 11, color: '#8a8680', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Items Ordered</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                {viewOrder.items?.map((item, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f7f5f2', borderRadius: 8, padding: '10px 14px' }}>
+                    <div>
+                      <p style={{ margin: 0, fontSize: 13.5, fontWeight: 500, color: '#1a1916' }}>{item.name}</p>
+                      {item.brand && <p style={{ margin: '2px 0 0', fontSize: 11.5, color: '#8a8680' }}>{item.brand}</p>}
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ margin: 0, fontSize: 13, color: '#8a8680' }}>x{item.qty}</p>
+                      <p style={{ margin: '2px 0 0', fontSize: 13, fontWeight: 600, color: '#2a7d3f' }}>RWF {(item.price * item.qty).toLocaleString()}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Total */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderTop: '1px solid #dedad3', borderBottom: '1px solid #dedad3', marginBottom: 16 }}>
+                <span style={{ fontSize: 13, color: '#8a8680', fontWeight: 600 }}>Total</span>
+                <strong style={{ fontSize: 15, color: '#2a7d3f' }}>RWF {viewOrder.total?.toLocaleString()}</strong>
+              </div>
+
+              {/* Vendor & delivery info */}
+              {viewOrder.vendorName && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div style={{ background: '#f7f5f2', borderRadius: 8, padding: '10px 14px' }}>
+                    <p style={{ margin: '0 0 4px', fontSize: 11, color: '#8a8680', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Assigned Vendor</p>
+                    <p style={{ margin: 0, fontSize: 13.5, fontWeight: 600, color: '#1a1916' }}>{viewOrder.vendorName}</p>
+                  </div>
+                  {viewOrder.deliveryDate && (
+                    <div style={{ background: '#f7f5f2', borderRadius: 8, padding: '10px 14px' }}>
+                      <p style={{ margin: '0 0 4px', fontSize: 11, color: '#8a8680', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Delivery Date</p>
+                      <p style={{ margin: 0, fontSize: 13.5, fontWeight: 600, color: '#1a1916' }}>{viewOrder.deliveryDate}</p>
+                    </div>
+                  )}
+                  {viewOrder.assignedAt && (
+                    <div style={{ background: '#f7f5f2', borderRadius: 8, padding: '10px 14px' }}>
+                      <p style={{ margin: '0 0 4px', fontSize: 11, color: '#8a8680', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Assigned On</p>
+                      <p style={{ margin: 0, fontSize: 13.5, fontWeight: 600, color: '#1a1916' }}>{new Date(viewOrder.assignedAt).toLocaleDateString()}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className={styles.modalFooter}>
+              <button className={styles.primaryBtn} onClick={() => setViewOrder(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── VIEW VENDOR MODAL ── */}
+      {viewVendor && (
+        <div className={styles.modalOverlay} onClick={() => setViewVendor(null)}>
+          <div className={styles.modal} style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Vendor Details</h2>
+              <button className={styles.modalClose} onClick={() => setViewVendor(null)}>✕</button>
+            </div>
+            <div className={styles.modalBody}>
+              {/* Avatar + name */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
+                <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg,#c8860a,#a06e08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                  {viewVendor.name.slice(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: '#1a1916' }}>{viewVendor.name}</p>
+                  <p style={{ margin: '4px 0 0', fontSize: 12, color: '#8a8680' }}>{viewVendor.email}</p>
+                </div>
+                <span className={styles.statusPill} style={{ marginLeft: 'auto', background: (statusColors[viewVendor.status] || '#6b7280') + '22', color: statusColors[viewVendor.status] || '#6b7280' }}>
+                  {viewVendor.status}
+                </span>
+              </div>
+              {/* Details grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 24px', marginBottom: 20 }}>
+                {[
+                  ['Vendor ID', viewVendor.id],
+                  ['Location', viewVendor.location],
+                  ['Availability', viewVendor.availability],
+                  ['Products Listed', viewVendor.products || '—'],
+                  ['Reliability Score', viewVendor.reliability ? viewVendor.reliability + '%' : 'N/A'],
+                ].map(([k, val]) => (
+                  <div key={k} style={{ background: '#f7f5f2', borderRadius: 8, padding: '10px 14px' }}>
+                    <p style={{ margin: 0, fontSize: 11, color: '#8a8680', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px' }}>{k}</p>
+                    <p style={{ margin: '4px 0 0', fontSize: 14, color: '#1a1916', fontWeight: 500 }}>{val}</p>
+                  </div>
+                ))}
+              </div>
+              {/* Reliability bar */}
+              {viewVendor.reliability && (
+                <div style={{ marginBottom: 20 }}>
+                  <p style={{ fontSize: 11, color: '#8a8680', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 8 }}>Reliability</p>
+                  <div style={{ height: 8, background: '#f0ede8', borderRadius: 10, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: viewVendor.reliability + '%', background: viewVendor.reliability > 90 ? '#22c55e' : viewVendor.reliability > 75 ? '#f59e0b' : '#ef4444', borderRadius: 10, transition: 'width 0.4s' }} />
+                  </div>
+                  <p style={{ fontSize: 12, color: viewVendor.reliability > 90 ? '#22c55e' : viewVendor.reliability > 75 ? '#f59e0b' : '#ef4444', fontWeight: 700, marginTop: 6 }}>{viewVendor.reliability}%</p>
+                </div>
+              )}
+            </div>
+            <div className={styles.modalFooter}>
+              {viewVendor.status === 'Approved' && (
+                <button className={styles.deleteBtn} style={{ padding: '10px 20px', fontSize: 13.5 }} onClick={() => { setViewVendor(null); setSuspendVendor(viewVendor); }}>✗ Suspend Vendor</button>
+              )}
+              <button className={styles.primaryBtn} onClick={() => setViewVendor(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── SUSPEND CONFIRM MODAL ── */}
+      {suspendVendor && (
+        <div className={styles.modalOverlay} onClick={() => setSuspendVendor(null)}>
+          <div className={styles.modal} style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Suspend Vendor</h2>
+              <button className={styles.modalClose} onClick={() => setSuspendVendor(null)}>✕</button>
+            </div>
+            <div className={styles.modalBody}>
+              <p style={{ fontSize: 14, color: '#1a1916', margin: 0 }}>
+                Are you sure you want to suspend <strong>{suspendVendor.name}</strong>?<br />
+                <span style={{ fontSize: 13, color: '#8a8680' }}>They will no longer be available for order assignments.</span>
+              </p>
+            </div>
+            <div className={styles.modalFooter}>
+              <button className={styles.cancelBtn} onClick={() => setSuspendVendor(null)}>Cancel</button>
+              <button className={styles.deleteBtn} style={{ padding: '10px 20px', fontSize: 13.5 }} onClick={() => handleSuspend(suspendVendor)}>✗ Yes, Suspend</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── ASSIGN VENDOR MODAL ── */}
       {assignModal && selectedOrder && (
         <div className={styles.modalOverlay} onClick={() => setAssignModal(false)}>
           <div className={styles.modal} style={{ maxWidth: 620 }} onClick={(e) => e.stopPropagation()}>
@@ -570,10 +1165,20 @@ export default function AdminDashboard({ user, onLogout }) {
             </div>
             <div className={styles.modalBody}>
 
-              {/* Order summary */}
+              {/* Order summary — no customer info sent to vendor */}
               <div className={styles.orderSummary} style={{ marginBottom: 20 }}>
-                <div className={styles.summaryRow}><span>Customer</span><strong>{selectedOrder.customer}</strong></div>
-                <div className={styles.summaryRow}><span>Original Product</span><strong>{selectedOrder.product}</strong></div>
+                <div className={styles.summaryRow}>
+                  <span>Order ID</span><strong>{selectedOrder.id}</strong>
+                </div>
+                <div className={styles.summaryRow}>
+                  <span>Items</span>
+                  <strong style={{ fontSize: 12 }}>
+                    {selectedOrder.items?.map(i => `${i.name} x${i.qty}`).join(', ') || selectedOrder.product}
+                  </strong>
+                </div>
+                <div className={styles.summaryRow}>
+                  <span>Total</span><strong className={styles.amount}>{selectedOrder.total?.toLocaleString()} RWF</strong>
+                </div>
               </div>
 
               {/* Vendor select */}

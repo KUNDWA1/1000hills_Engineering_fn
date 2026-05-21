@@ -282,6 +282,7 @@ export default function App() {
         items={cart}
         onRemove={removeFromCart}
         onUpdateQty={updateQty}
+        loggedInUser={loggedInUser}
       />
     </div>
   );
