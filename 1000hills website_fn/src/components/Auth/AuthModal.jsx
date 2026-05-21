@@ -4,7 +4,7 @@ import styles from './AuthModal.module.css';
 
 export default function AuthModal({ isOpen, onClose, onLoginSuccess }) {
   const [view, setView] = useState('signin'); // 'signin' | 'signup' | 'success'
-  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+  const [formData, setFormData] = useState({ name: '', email: '', password: '', role: 'customer' });
   const [error, setError] = useState('');
 
   if (!isOpen) return null;
@@ -20,7 +20,6 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }) {
 
   const handleSignIn = (e) => {
     e.preventDefault();
-    // Check if account exists in localStorage
     const stored = localStorage.getItem('1h_user_' + formData.email);
     if (!stored) {
       setError('No account found with this email. Please create an account.');
@@ -31,7 +30,6 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }) {
       setError('Incorrect password. Please try again.');
       return;
     }
-    // Login success
     localStorage.setItem('1h_logged_in', JSON.stringify(user));
     onClose();
     if (onLoginSuccess) onLoginSuccess(user);
@@ -39,24 +37,32 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }) {
 
   const handleSignUp = (e) => {
     e.preventDefault();
-    // Check if account already exists
     const existing = localStorage.getItem('1h_user_' + formData.email);
     if (existing) {
       setError('An account with this email already exists. Please sign in.');
       return;
     }
-    // Save new user
-    const user = { name: formData.name, email: formData.email, password: formData.password };
+    const user = {
+      name: formData.name,
+      email: formData.email,
+      password: formData.password,
+      role: formData.role,
+    };
     localStorage.setItem('1h_user_' + formData.email, JSON.stringify(user));
-    // Show success, then redirect to signin
     setView('success');
   };
 
   const switchTo = (v) => {
-    setFormData({ name: '', email: '', password: '' });
+    setFormData({ name: '', email: '', password: '', role: 'customer' });
     setError('');
     setView(v);
   };
+
+  const roles = [
+    { value: 'customer', label: 'Customer', icon: '🛒', desc: 'Browse & purchase products' },
+    { value: 'vendor',   label: 'Vendor',   icon: '🏭', desc: 'Sell & manage your products' },
+    { value: 'admin',    label: 'Admin',     icon: '⚙️', desc: 'Manage the platform' },
+  ];
 
   return createPortal(
     <div className={styles.overlay} onClick={handleOverlayClick}>
@@ -138,6 +144,32 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }) {
                   value={formData.password} onChange={handleChange}
                   placeholder="••••••••••" minLength={6} required />
               </div>
+
+              {/* ── ROLE SELECTOR ── */}
+              <div className={styles.fieldGroup}>
+                <label className={styles.label}>I am a</label>
+                <div className={styles.roleGrid}>
+                  {roles.map((r) => (
+                    <label
+                      key={r.value}
+                      className={`${styles.roleCard} ${formData.role === r.value ? styles.roleCardActive : ''}`}
+                    >
+                      <input
+                        type="radio"
+                        name="role"
+                        value={r.value}
+                        checked={formData.role === r.value}
+                        onChange={handleChange}
+                        className={styles.roleRadio}
+                      />
+                      <span className={styles.roleIcon}>{r.icon}</span>
+                      <span className={styles.roleLabel}>{r.label}</span>
+                      <span className={styles.roleDesc}>{r.desc}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
               <button type="submit" className={styles.primaryBtn}>Create Account</button>
             </form>
 

@@ -7,6 +7,10 @@ import SearchPage from './components/SearchPage/SearchPage';
 import Cart from './components/Cart/Cart';
 import Footer from './components/Footer/Footer';
 import WelcomePage from './components/WelcomePage/WelcomePage';
+import VendorDashboard from './components/VendorDashboard/VendorDashboard';
+import AdminDashboard from './components/AdminDashboard/AdminDashboard';
+import VendorSetup from './components/VendorSetup/VendorSetup';
+import VendorPending from './components/VendorSetup/VendorPending';
 
 import { constructionToolsProducts } from './data/ConstructionTools_products';
 import { generatorsProducts } from './data/Generators & Power_products';
@@ -32,20 +36,36 @@ const categoryMeta = {
 };
 
 export default function App() {
-  // 'home' | 'category' | 'detail' | 'search' | 'welcome'
-  const [activePage, setActivePage]       = useState('home');
+  // 'home' | 'category' | 'detail' | 'search' | 'welcome' | 'vendor' | 'vendor-setup' | 'vendor-pending' | 'admin'
+  const [activePage, setActivePage]         = useState('home');
   const [activeCategory, setActiveCategory] = useState('construction-tools');
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [searchQuery, setSearchQuery]     = useState('');
+  const [searchQuery, setSearchQuery]       = useState('');
   const [categorySearch, setCategorySearch] = useState('');
-  const [cart, setCart]                   = useState([]);
-  const [cartOpen, setCartOpen]           = useState(false);
-  const [loggedInUser, setLoggedInUser]   = useState(null);
+  const [cart, setCart]                     = useState([]);
+  const [cartOpen, setCartOpen]             = useState(false);
+  const [loggedInUser, setLoggedInUser]     = useState(null);
 
   // ── Auth helpers ──
   function handleLoginSuccess(user) {
     setLoggedInUser(user);
-    setActivePage('welcome');
+    const role = user?.role || 'customer';
+    if (role === 'vendor') {
+      // Check profile status from localStorage (always fresh)
+      const fresh = JSON.parse(localStorage.getItem('1h_user_' + user.email) || '{}');
+      const status = fresh.profileStatus;
+      if (status === 'approved') {
+        setActivePage('vendor');
+      } else if (status === 'pending') {
+        setActivePage('vendor-pending');
+      } else {
+        setActivePage('vendor-setup');
+      }
+    } else if (role === 'admin') {
+      setActivePage('admin');
+    } else {
+      setActivePage('welcome');
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -121,6 +141,40 @@ export default function App() {
     : allItems;
 
   const meta = categoryMeta[activeCategory];
+
+  // ── Dashboard pages (full-screen, no navbar/footer) ──
+  if (activePage === 'vendor-setup') {
+    return (
+      <VendorSetup
+        user={loggedInUser}
+        onSubmitted={() => {
+          setActivePage('vendor-pending');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+      />
+    );
+  }
+
+  if (activePage === 'vendor-pending') {
+    return (
+      <VendorPending
+        user={loggedInUser}
+        onLogout={handleLogout}
+        onApproved={() => {
+          setActivePage('vendor');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+      />
+    );
+  }
+
+  if (activePage === 'vendor') {
+    return <VendorDashboard user={loggedInUser} onLogout={handleLogout} />;
+  }
+
+  if (activePage === 'admin') {
+    return <AdminDashboard user={loggedInUser} onLogout={handleLogout} />;
+  }
 
   return (
     <div className={styles.app}>
@@ -200,7 +254,7 @@ export default function App() {
                 <circle cx="11" cy="11" r="8"/>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"/>
               </svg>
-              <p>No products found for "<strong>{categorySearch}</strong>"</p>
+              <p>No products found for &quot;<strong>{categorySearch}</strong>&quot;</p>
               <button className={styles.clearSearchBtn} onClick={() => setCategorySearch('')}>Clear search</button>
             </div>
           )}
